@@ -1,4 +1,4 @@
-#' Check views for consistency.
+#' Check views for consistency
 #' Views must have exactly the same row names
 #' @param view1 View 1
 #' @param view2 View 2
@@ -14,9 +14,28 @@ checkViews <- function(view1, view2) {
   if ( ! identical( row.names(view1), row.names(view2)) ) {
     stop("Preparing data failed: Order of row names differs between views")
   }
-  if (  sum(apply(view1,2,function(x) ! x %in% c(0,1)))> 0 | sum(apply(view2,2,function(x) ! x %in% c(0,1)))> 0 ) {
-    stop("Preparing data failed: Views may only contain binary data")
+
+}
+
+
+#' Counts unique values in both views
+#' Stops on any non-numeric values
+#' @param view1 View 1
+#' @param view2 View 2
+#' @return list containing unique values for each view
+
+viewsClasses <- function(view1, view2) {
+  nrColsView1 <- dim(view1)[2]
+  nrColsView2 <- dim(view2)[2]
+  if (sum(apply(view1,2,is.numeric)) < nrColsView1) {
+    stop("view1 contains non-numeric columns")
   }
+  if (sum(apply(view2,2,is.numeric)) < nrColsView2) {
+    stop("view2 contains non-numeric columns")
+  }
+  uniqueValsView1 <- sort(unique(unlist(apply(view1,2,unique),use.names=F)))
+  uniqueValsView2 <- sort(unique(unlist(apply(view2,2,unique),use.names=F)))
+  list(view1=uniqueValsView1, view2=uniqueValsView2)
 }
 
 
@@ -236,26 +255,48 @@ assignFinIdxPerClSkm <- function(view1,view2,mPerClV) {
 
 
 
-# # # Mixture of Binomials EM # # #
+# # # Mixture of Categoricals EM # # #
 
 
 #' Calculate Bernoulli likelihood
-#' @param x a binary event
-#' @param prob the Bernoulli probability
+#' @param x a binary event (vector)
+#' @param prob the Bernoulli probability (vector)
 #' @return Bernoulli likelihood
 
 dbern <- function(x,prob) {
   prob^x * (1-prob)^(1-x)
 }
 
+#' Calculate categorical likelihood
+#' @param x a categorical event vector
+#' @param prob the categorical probability matrix (rows along events, cols along event values)
+#' @return categorical likelihood
+#' @examples {
+#'   dcat(c(1,2,1),matrix(c(.9,.8,.9,.1,.2,.1),3,2))
+#' }
 
-#' Calculate Bernoulli likelihood for a rows of binary events
+dcat <- function(x,prob) {
+    sapply(seq_along(x), function(idx) prob[idx,x[idx]])
+}
+
+
+#' Calculate Bernoulli likelihood row-wise for binary events
 #' @param X a matrix of binary events (row-wise)
-#' @param prob the Bernoulli probability
+#' @param prob the Bernoulli probability vector (along events)
 #' @return a matrix of Bernoulli likelihoods
 
 mApplyBern <- function(X,prob) {
     t ( apply(X,1,function(x) dbern(x,prob)) )
+}
+
+
+#' Calculate categorical likelihood row-wise for categorical events
+#' @param X a matrix of categorical events (row-wise)
+#' @param prob the categorical probability matrix (rows along events, cols along event values)
+#' @return a matrix of categorical likelihoods
+
+mApplyCat <- function(X,prob) {
+    t ( apply(X,1,function(x) dcat(x,prob)) )
 }
 
 
@@ -268,14 +309,34 @@ mApplyBern <- function(X,prob) {
 #'   prob=c(.1,.2,.1,.1) # prob per index
 #'   dput(mApplyBern(X,prob)) # likelihood for each index
 #'   #structure(c(0.9, 0.9, 0.2, 0.8, 0.9, 0.1, 0.9, 0.9), .Dim = c(2L, 4L))
-#'   dput(estLogPxGthetaJ(X,log(prob))) 
+#'   dput(estLogPxBernGthetaJ(X,log(prob))) 
 #'   # c(-1.92551945940758, -2.73644967562391)
 #' }
 
-estLogPxGthetaJ <- function (X, logprob) {
+estLogPxBernGthetaJ <- function (X, logprob) {
   # prob is a vector of size #words
   # X is a matrix (nrow=n, ncol=#words)
   apply(mApplyBern(X,exp(logprob)), 1, function(x) cumsum(log(x))[length(x)] )
+}
+
+
+#' Estimate log document probabilites given specific Categorical parameters
+#' @param X a matrix of categorical events (row-wise)
+#' @param logprob the Categorical probability
+#' 
+#' @examples {
+#'   X=matrix(c(1,2,1,1,1,1,2,1),2,4,byrow=TRUE) # two documents of length 4
+#'   prob=matrix(c(.9,.8,.9,.9,.1,.2,.1,.1),4,2) # prob per index
+#'   dput(mApplyCat(X,prob)) # likelihood for each index
+#'   #structure(c(0.9, 0.9, 0.2, 0.8, 0.9, 0.1, 0.9, 0.9), .Dim = c(2L, 4L))
+#'   dput(estLogPxCatGthetaJ(X,log(prob))) 
+#'   # c(-1.92551945940758, -2.73644967562391)
+#' }
+
+estLogPxCatGthetaJ <- function (X, logprob) {
+  # prob is a matrix of size #words x #classes
+  # X is a matrix (nrow=n, ncol=#words)
+  apply(mApplyCat(X,exp(logprob)), 1, function(x) cumsum(log(x))[length(x)] )
 }
 
 
@@ -299,7 +360,6 @@ logsum <- function(logx) {
   }
   mypi + log(mysum)
 }
-
 
 
 #' objective function for mixture of binomials EM: 

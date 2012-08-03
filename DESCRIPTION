@@ -10,13 +10,13 @@ Description: An implementation of Multi-View Clustering (Bickel and
         developed in the paper), and Spherical k-Means. The latter
         represents documents as vectors in the categorical space.
 URL: http://cs.maunz.de
-Version: 1.1
+Version: 1.2
 Maintainer: Andreas Maunz <andreas@maunz.de>
 Author: Andreas Maunz <andreas@maunz.de>
 Depends: R (>= 2.14.1), rattle (>= 2.6.18)
 Suggests:
 Imports:
 License: BSD
-Packaged: 2012-08-01 14:57:10 UTC; am
+Packaged: 2012-08-03 08:43:37 UTC; am
 Repository: CRAN
-Date/Publication: 2012-08-01 16:55:06
+Date/Publication: 2012-08-03 08:57:42
